@@ -1,4 +1,6 @@
-// Intentionally empty by default.
-// Add Drizzle tables here when the site actually needs a database.
-// See examples/d1/db/schema.ts for an opt-in example.
-export {};
+import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
+export const ledgerRecords=sqliteTable('ledger_records',{userId:text('user_id').notNull(),id:text('id').notNull(),kind:text('kind').notNull(),localDate:text('local_date').notNull(),revision:integer('revision').notNull(),createdAt:text('created_at').notNull(),updatedAt:text('updated_at').notNull(),payload:text('payload').notNull()},t=>[primaryKey({columns:[t.userId,t.id]}),index('records_user_date').on(t.userId,t.localDate,t.createdAt,t.id)]);
+export const ledgerRevisions=sqliteTable('ledger_revisions',{userId:text('user_id').notNull(),recordId:text('record_id').notNull(),revision:integer('revision').notNull(),payload:text('payload').notNull()},t=>[primaryKey({columns:[t.userId,t.recordId,t.revision]})]);
+export const settingsVersions=sqliteTable('settings_versions',{userId:text('user_id').notNull(),revision:integer('revision').notNull(),effectiveFrom:text('effective_from').notNull(),updatedAt:text('updated_at').notNull(),payload:text('payload').notNull(),requestId:text('request_id').notNull()},t=>[primaryKey({columns:[t.userId,t.revision]}),index('settings_effective').on(t.userId,t.effectiveFrom,t.revision)]);
+export const mutationReceipts=sqliteTable('mutation_receipts',{userId:text('user_id').notNull(),requestId:text('request_id').notNull(),operationHash:text('operation_hash').notNull(),recordId:text('record_id'),revision:integer('revision').notNull(),savedAt:text('saved_at').notNull(),payload:text('payload'),deletedAt:text('deleted_at')},t=>[primaryKey({columns:[t.userId,t.requestId]}),index('receipts_record').on(t.userId,t.recordId)]);
+export const expiredRequests=sqliteTable('expired_requests',{requestHash:text('request_hash').primaryKey()});
