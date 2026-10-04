@@ -11,7 +11,9 @@ npm run typecheck
 git diff --check
 ```
 
-`npm test` 使用 Node 原生 TypeScript 去型別及 `node:test`；SQLite adapter 使用 `node:sqlite`。本分支三個 `*.test.ts` 共 **56 項通過**，對應後端 `c3078c0`。這個數字不包含 parent 擁有的 `transport.test.ts`，也不代表全部 T01–T28 的真實情境已驗收。
+`npm test` 使用 Node 原生 TypeScript 去型別及 `node:test`；SQLite adapter 使用 `node:sqlite`。首輪三個 `*.test.ts` 共 **56 項通過**，對應後端 `c3078c0`。這個數字不包含 parent 擁有的 `transport.test.ts`，也不代表全部 T01–T28 的真實情境已驗收。
+
+後端 `9a9dbd7` 新增主食補足後，再補一個 T25 案例並以 `node --experimental-strip-types --test --test-name-pattern='T25:' tests/domain.test.ts` 驗證，兩個相關測試通過。此階段沒有重跑全部測試；最終整合由 parent 驗證。
 
 曾對舊後端 `be1e276` 實際執行新增風險案例，得到七項失敗：回顧缺少實際餐點、營養、恢復或表現仍允許調整；十秒跑步紀錄可觸發變速跑；目標日前三天未抑制變速跑；疼痛未知仍被當成恢復證據。合併修正後上述案例通過。
 
