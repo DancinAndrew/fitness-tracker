@@ -193,6 +193,23 @@ test('T25: sufficient reported intake does not force a food purchase; machine ca
   assert.ok(suggestions.every(suggestion => !suggestion.requires_confirmation));
 });
 
+test('T25: low energy with adequate protein and vegetables offers optional starch; adequate energy needs no supplement', () => {
+  const records = [record(meal({ items: [item({ vegetable_servings: 3,
+    nutrients: { kcal: range(1500), protein_g: range(120), carbs_g: range(200), fat_g: range(30) } })] }))];
+  const before = structuredClone(records);
+  const suggestions = foodSuggestions(summarizeIntake(records, DAY), defaultSettings());
+  assert.ok(suggestions.length > 0 && suggestions.length <= 2);
+  assert.ok(suggestions.some(suggestion => /主食|地瓜|飯糰/.test(suggestion.title + suggestion.detail)));
+  assert.ok(suggestions.some(suggestion => /不必.*硬吃|不用.*硬吃|依飢餓/.test(suggestion.title + suggestion.detail)));
+  assert.ok(suggestions.every(suggestion => !suggestion.requires_confirmation));
+  assert.deepEqual(records, before, 'Recommendations never add consumed records or change totals');
+  const adequate = [record(meal({ items: [item({ vegetable_servings: 3,
+    nutrients: { kcal: range(2000), protein_g: range(120), carbs_g: range(200), fat_g: range(30) } })] }))];
+  const enough = foodSuggestions(summarizeIntake(adequate, DAY), defaultSettings());
+  assert.ok(enough.some(suggestion => /不需要|不用|無需/.test(suggestion.title + suggestion.detail)));
+  assert.equal(enough.some(suggestion => /地瓜|飯糰/.test(suggestion.title + suggestion.detail)), false);
+});
+
 function fullReviewFixture(): LedgerRecord[] {
   const { sessions } = progressionFixture();
   const records = [...sessions];
