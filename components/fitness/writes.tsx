@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import type { MutationReceipt, SettingsVersion } from '@/lib/contracts';
 import { api, ApiError } from './shared';
 
 export type Write = (path: string, method: 'POST' | 'PUT' | 'DELETE', body: object, label: string) => Promise<boolean>;
@@ -40,7 +41,10 @@ export function useWrites(ownerKey: string | null, onSaved: () => Promise<void>)
     if (!ownerKey || inFlight.current) return false;
     inFlight.current = true; setBusy(true); setNotice('');
     try {
-      await api(item.path, { method: item.method, body: JSON.stringify(item.body) });
+      const receipt = await api<MutationReceipt | SettingsVersion>(item.path, { method: item.method, body: JSON.stringify(item.body) });
+      if (item.method !== 'DELETE' && item.path.startsWith('/records') && 'record' in receipt && receipt.record === null) {
+        throw new ApiError('這筆紀錄已刪除；舊請求沒有重新保存。請取消這次變更。', 410);
+      }
       store(null); setNotice(`${item.label}已保存至雲端。`);
       await onSaved(); return true;
     } catch (err) {
