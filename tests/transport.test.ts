@@ -66,3 +66,23 @@ test('MCP valid call uses same service; invalid values never reach service', asy
   assert.ok(invalid.error);
   assert.equal(calls, 1);
 });
+
+test('MCP client metadata is accepted without becoming a tool argument or identity', async () => {
+  const seen: string[] = [];
+  const factory = () => ({ getSettings: async (user: string) => { seen.push(user); return { revision: 0 }; } } as unknown as LedgerService);
+  const body = { jsonrpc: '2.0', id: 'metadata-call', method: 'tools/call', params: { name: 'health_get_settings', arguments: {}, _meta: { progressToken: 'synthetic-progress', user_id: 'another-owner' } } };
+  const response = await handleMCP(request('/mcp', 'POST', body), factory);
+  const result = await response.json() as { id: string; result: { isError: boolean; structuredContent: { data: { revision: number } } } };
+  assert.equal(result.id, 'metadata-call');
+  assert.equal(result.result.isError, false);
+  assert.equal(result.result.structuredContent.data.revision, 0);
+  assert.deepEqual(seen, ['synthetic-owner']);
+});
+
+test('MCP metadata does not relax strict health arguments or anonymous access', async () => {
+  const body = { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'health_get_settings', arguments: { user_id: 'another-owner' }, _meta: { progressToken: 9 } } };
+  const invalid = await (await handleMCP(request('/mcp', 'POST', body), forbidden)).json() as { error: { data: { stage: string } } };
+  assert.equal(invalid.error.data.stage, 'arguments');
+  const anonymous = new Request('https://fitness.test/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await handleMCP(anonymous, forbidden)).status, 401);
+});

@@ -23,6 +23,7 @@ const tools = [
 
 export async function handleMCP(request: Request, makeService: ServiceFactory): Promise<Response> {
   let id: string | number | null = null;
+  let validationStage = 'request';
   const reply = (value: object) => Response.json({ jsonrpc: '2.0', id, ...value }, { headers: privateHeaders });
   try {
     const message = z.object({ jsonrpc: z.literal('2.0'), id: z.union([z.string().max(200), z.number().finite(), z.null()]).optional(), method: z.string(), params: z.unknown().optional() }).strict().parse(await readJSON(request));
@@ -34,9 +35,13 @@ export async function handleMCP(request: Request, makeService: ServiceFactory): 
     if (message.method === 'tools/list') return reply({ result: { tools: tools.map(t => ({ name: t.name, description: t.description, inputSchema: jsonSchema(t.schema), annotations: { readOnlyHint: !t.write, destructiveHint: t.name === 'health_delete_record', idempotentHint: true, openWorldHint: false } })) } });
     if (message.method !== 'tools/call') return reply({ error: { code: -32601, message: 'Method not found' } });
     const user = identity(request);
-    const call = z.object({ name: z.string(), arguments: z.unknown().optional() }).strict().parse(message.params);
+    validationStage = 'call';
+    // MCP clients may attach protocol metadata such as a progress token. It is
+    // not a health-tool argument or a source of identity/authorization.
+    const call = z.object({ name: z.string(), arguments: z.unknown().optional(), _meta: z.record(z.unknown()).optional() }).strict().parse(message.params);
     const tool = tools.find(t => t.name === call.name);
     if (!tool) return reply({ error: { code: -32602, message: 'Unknown tool' } });
+    validationStage = 'arguments';
     tool.schema.parse(call.arguments ?? {});
     const service = makeService();
     try {
@@ -58,6 +63,6 @@ export async function handleMCP(request: Request, makeService: ServiceFactory): 
     } catch (error) { const { status: _status, ...safe } = safeError(error); return reply({ result: { content: [{ type: 'text', text: JSON.stringify({ error: safe }) }], isError: true } }); }
   } catch (error) {
     if (error instanceof LedgerError) return errorResponse(error);
-    return reply({ error: { code: -32602, message: 'Invalid request or tool arguments' } });
+    return reply({ error: { code: -32602, message: 'Invalid request or tool arguments', data: { stage: validationStage } } });
   }
 }
