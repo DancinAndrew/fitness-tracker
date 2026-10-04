@@ -7,8 +7,8 @@ import { Field, NumberInput } from './settings';
 import { Panel } from './shared';
 import type { Write } from './writes';
 
-const exerciseNames = { goblet_squat: '高腳杯深蹲', dumbbell_rdl: '啞鈴羅馬尼亞硬舉', floor_press: '地板臥推', one_arm_row: '單手划船', dead_bug: '死蟲式', reverse_lunge: '反向弓步', glute_bridge: '臀橋', shoulder_press: '肩推', plank: '棒式' };
-const loadNames = { single_dumbbell_total: '單顆啞鈴總重量', per_dumbbell: '每手啞鈴重量', single_active_dumbbell: '單側使用的啞鈴重量', external_total: '外加總重量', bodyweight: '自體重量' };
+export const exerciseNames = { goblet_squat: '高腳杯深蹲', dumbbell_rdl: '啞鈴羅馬尼亞硬舉', floor_press: '地板臥推', one_arm_row: '單手划船', dead_bug: '死蟲式', reverse_lunge: '反向弓步', glute_bridge: '臀橋', shoulder_press: '肩推', plank: '棒式' };
+export const loadNames = { single_dumbbell_total: '單顆啞鈴總重量', per_dumbbell: '每手啞鈴重量', single_active_dumbbell: '單側使用的啞鈴重量', external_total: '外加總重量', bodyweight: '自體重量' };
 const emptySet = (): ExerciseSet => ({ exercise_id: 'goblet_squat', set_type: 'work', load_mode: 'per_dumbbell', load_kg: null, reps: null, left_reps: null, right_reps: null, duration_seconds: null, rir: null, controlled_form: null, pain: null });
 const nullableBoolean = (value: string) => value === '' ? null : value === 'true';
 
