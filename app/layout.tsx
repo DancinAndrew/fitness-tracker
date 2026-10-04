@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "日常進度 · Fitness Tracker",
   description: "私人的飲食、訓練與身體量測紀錄。",
+  robots: { index: false, follow: false },
   other: {
     "codex-preview": "development",
   },
