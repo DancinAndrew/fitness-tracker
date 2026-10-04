@@ -48,7 +48,7 @@ function exercise(id:ExercisePrescription['id'],name:string,reps:[number,number]
 const A=[exercise('goblet_squat','高腳杯深蹲',[8,12],'single_dumbbell_total',false,false,'啞鈴靠胸，腳掌穩定，控制深度'),exercise('dumbbell_rdl','啞鈴羅馬尼亞硬舉',[8,12],'per_dumbbell',false,false,'臀部後推，啞鈴靠腿，不追求碰地'),exercise('floor_press','啞鈴地板胸推',[8,12],'per_dumbbell',false,false,'上臂輕觸地面，不撞地反彈'),exercise('one_arm_row','單臂啞鈴划船',[8,12],'single_active_dumbbell',true,false,'軀幹穩定，不靠轉身甩動'),exercise('dead_bug','Dead Bug',[6,8],'bodyweight',true,true,'慢做，保持腰背控制')];
 const B=[exercise('reverse_lunge','反向弓箭步',[8,10],'per_dumbbell',true,false,'前腳穩定，平衡不穩先徒手'),exercise('glute_bridge','臀橋',[10,15],'external_total',false,false,'不刻意拱腰，徒手不足再加啞鈴'),exercise('shoulder_press','啞鈴肩推',[8,12],'per_dumbbell',false,false,'腹部收穩，不後仰頂起'),A[3],exercise('plank','平板支撐',null,'bodyweight',false,true,'維持呼吸，姿勢失控就結束')];
 function ordered(records:LedgerRecord[]):LedgerRecord[]{return [...records].sort((a,b)=>a.local_date.localeCompare(b.local_date)||a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));}
-function recoveryEvidence(records:LedgerRecord[],date:string):boolean {const past=ordered(records.filter(r=>r.date_confirmed&&r.local_date<=date));const sessions=past.filter(r=>r.kind==='workout'&&['completed','partial'].includes(r.data.status));const latest=sessions.at(-1);return latest?.kind==='workout'&&latest.data.recovery_ok===true&&!latest.data.safety_hold&&!latest.data.sets.some(s=>s.pain===true)&&!past.filter(r=>r.local_date>=latest.local_date).some(r=>r.kind==='note'&&(r.data.fatigue==='poor'||r.data.soreness==='affects_movement'||(r.data.sleep_hours!==null&&r.data.sleep_hours<7)));}
+function recoveryEvidence(records:LedgerRecord[],date:string):boolean {const past=ordered(records.filter(r=>r.date_confirmed&&r.local_date<=date));const sessions=past.filter(r=>r.kind==='workout'&&['completed','partial'].includes(r.data.status));const latest=sessions.at(-1);return latest?.kind==='workout'&&latest.data.recovery_ok===true&&!latest.data.safety_hold&&(latest.data.activity!=='strength'||latest.data.sets.some(s=>s.set_type==='work'))&&latest.data.sets.filter(s=>s.set_type==='work').every(s=>s.pain===false)&&!past.filter(r=>r.local_date>=latest.local_date).some(r=>r.kind==='note'&&(r.data.fatigue==='poor'||r.data.soreness==='affects_movement'||(r.data.sleep_hours!==null&&r.data.sleep_hours<7)));}
 export function buildTodayPlan(date:string,settings:Settings,records:LedgerRecord[]=[]):TodayPlan {
  const weekday=new Date(`${date}T00:00:00Z`).getUTCDay();
  const week=settings.start_date&&date>=settings.start_date?Math.floor((Date.parse(`${date}T00:00:00Z`)-Date.parse(`${settings.start_date}T00:00:00Z`))/604800000)+1:null;
@@ -67,7 +67,7 @@ export function buildTodayPlan(date:string,settings:Settings,records:LedgerRecor
    if(week!==null&&week>1&&week<=4){
     plan.progression_pending=!recovered;
     if(weekday===3&&recovered){plan.duration_minutes=week===2?[35,35]:week===3?[40,40]:[35,40];plan.instructions[1]=`暖身五分鐘，主要慢跑${week===2?'約 25':week===3?'約 30':'25–30'}分鐘，緩和五分鐘；依恢復調整。`;}
-    const steady=records.some(r=>r.kind==='workout'&&r.date_confirmed&&r.local_date<date&&r.data.activity==='run'&&r.data.status==='completed'&&r.data.recovery_ok===true&&r.data.talk_test==='full_sentences'&&!r.data.safety_hold);
+    const steady=records.filter(r=>r.kind==='workout'&&r.date_confirmed&&r.local_date<date&&r.local_date>=shiftDate(date,-14)&&r.data.activity==='run'&&r.data.status==='completed'&&r.data.duration_seconds!==null&&r.data.duration_seconds>=1800&&r.data.recovery_ok===true&&r.data.talk_test==='full_sentences'&&!r.data.safety_hold&&r.data.sets.filter(s=>s.set_type==='work').every(s=>s.pain===false)).length>=2;
     if(weekday===5&&recovered&&steady){plan.title='條件式變速跑';plan.warmup_minutes=8;plan.duration_minutes=week===2?[25,25]:week===3?[25,31]:[25,31];plan.instructions[1]=`暖身八分鐘，每回稍快跑一分鐘＋輕鬆走／跑兩分鐘，${week===2?'四回':week===3?'最多六回':'四至六回'}，緩和五分鐘；稍快段約 7/10，不是全力衝刺。`;plan.progression_pending=false;}
     else if(weekday===5){plan.progression_pending=true;plan.instructions.push('先確認穩定跑可重現、無異常不適及隔日恢复正常；步態受痠痛影響時改輕鬆走 20–30 分鐘或休息。');}
     if(!recovered)plan.instructions.push('缺少明確恢復證據，先維持原量，不因週次自动加量。');
@@ -77,7 +77,7 @@ export function buildTodayPlan(date:string,settings:Settings,records:LedgerRecor
  if(phase==='review_needed')plan.instructions.push('四週模板已結束，先回顧並確認新計畫，不自動套用下一輪進階。');
  const holds=records.some(r=>r.date_confirmed&&r.local_date===date&&r.kind==='workout'&&r.data.safety_hold);
  if(holds){plan.title='停止進階並檢視異常';plan.activity='recovery';plan.exercises=[];plan.duration_minutes=null;plan.progression_pending=true;plan.instructions.push('已有安全暫停紀錄，先停止活動；嚴重呼吸困難、胸部疼痛或接近昏倒時尋求緊急醫療協助，不透過加練或降速繼續。');}
- if(settings.target_date&&date<=settings.target_date&&date>=shiftDate(settings.target_date,-3)){plan.progression_pending=true;plan.instructions.push('距已確認目標日三天內：減少疲勞，不加量、不嘗試新動作，不把腿練到嚴重痠痛。');}
+ if(settings.target_date&&date<=settings.target_date&&date>=shiftDate(settings.target_date,-3)){plan.progression_pending=true;if(plan.activity==='run'){plan.title='減少疲勞：休息或平地輕鬆走';plan.activity='recovery';plan.duration_minutes=[0,30];plan.warmup_minutes=0;plan.cooldown_minutes=0;plan.instructions=['休息或平地輕鬆走 20–30 分鐘，不加變速回合。'];}else if(plan.activity==='strength'){plan.title+='（減少疲勞）';plan.exercises=plan.exercises.map(e=>({...e,sets:Math.min(e.sets,2)}));}plan.instructions.push('距已確認目標日三天內：減少疲勞，不加量、不嘗試新動作，不把腿練到嚴重痠痛。');}
  return plan;
 }
 export function paceToSpeed(pace:string):number {const match=/^(\d+):([0-5]\d)$/.exec(pace);if(!match||Number(match[1])*60+Number(match[2])===0)throw new LedgerError('invalid_pace','配速格式須為分:秒');return 3600/(Number(match[1])*60+Number(match[2]));}
@@ -124,8 +124,20 @@ export function buildReview(records:LedgerRecord[],date:string):Review {
  const complete=new Set(selected.filter(r=>r.kind==='note'&&r.date_confirmed&&r.data.day_complete).map(r=>r.local_date));
  const flags=selected.filter(r=>r.date_confirmed&&((r.kind==='workout'&&(r.data.safety_hold||r.data.recovery_ok===false||r.data.sets.some(s=>s.pain===true)))||(r.kind==='note'&&(r.data.fatigue==='poor'||r.data.soreness==='affects_movement'||(r.data.sleep_hours!==null&&r.data.sleep_hours<7))))).length;
  const change=current.average_kg===null||previous.average_kg===null?null:Number((current.average_kg-previous.average_kg).toFixed(3));
- const insufficient=change===null||waist.length<2||complete.size<14||workouts.length===0;
- const status=insufficient?'insufficient_data':flags?'review':change!<0||waist.at(-1)!.value<waist[0].value?'maintain':'review';
- const messages=insufficient?['資料不足：兩個固定七日視窗各需至少三個有效晨重日期，並補充腰圍、訓練表現、恢復與飲食完整度；不能確認停滯。']:flags?['恢復或疼痛紀錄需先檢視，不繼續減餐或加量。']:status==='maintain'?['體重平均或腰圍緩慢下降，先維持並確認訓練表現與恢復。']:['先檢查份量、油、醬、飲料與實際執行；確認後才討論每日少約 100–150 kcal，不自動套用。'];
+ const performanceKnown=workouts.length>0&&workouts.every(r=>{
+  if(r.kind!=='workout')return false;
+  if(r.data.activity==='strength'){const work=r.data.sets.filter(s=>s.set_type==='work');return work.length>0&&work.every(s=>(s.load_kg!==null||s.load_mode==='bodyweight')&&(s.reps!==null||(s.left_reps!==null&&s.right_reps!==null)||s.duration_seconds!==null)&&s.rir!==null&&s.controlled_form!==null&&s.pain!==null);}
+  if(r.data.activity==='run')return r.data.duration_seconds!==null&&r.data.distance_km!==null&&r.data.talk_test!=='unknown';
+  if(r.data.activity==='dance')return r.data.rounds!==null&&r.data.round_seconds!==null&&r.data.round_quality.trim().length>0;
+  return true;
+ });
+ const recoveryKnown=workouts.length>0&&workouts.every(r=>r.kind==='workout'&&r.data.recovery_ok!==null);
+ const performance=new Map<string,number[]>();
+ for(const r of ordered(workouts)){if(r.kind!=='workout'||r.data.activity!=='strength')continue;const groups=new Map<string,number[]>();for(const s of r.data.sets){if(s.set_type!=='work')continue;const value=s.left_reps!==null&&s.right_reps!==null?Math.min(s.left_reps,s.right_reps):s.reps??s.duration_seconds;if(value===null)continue;const key=JSON.stringify([s.exercise_id,s.load_mode,s.load_kg,s.duration_seconds!==null&&s.reps===null?'seconds':'reps']);groups.set(key,[...(groups.get(key)??[]),value]);}for(const [key,values] of groups){const mean=values.reduce((a,b)=>a+b,0)/values.length;performance.set(key,[...(performance.get(key)??[]),mean]);}}
+ const performanceDecline=[...performance.values()].some(values=>values.length>=2&&values.at(-1)!<values[0]);
+ const intakeKnown=reported.size===14&&[...reported].every(day=>{const intake=summarizeIntake(selected,day);return intake.day_complete&&intake.pending_meals===0&&nutrientNames.every(name=>intake.nutrients[name].range!==null&&intake.nutrients[name].unknown_items===0);});
+ const insufficient=change===null||waist.length<2||complete.size<14||!intakeKnown||!performanceKnown||!recoveryKnown;
+ const status=insufficient?'insufficient_data':flags||performanceDecline?'review':(change!==null&&change<0)||waist.at(-1)!.value<waist[0].value?'maintain':'review';
+ const messages=insufficient?['資料不足：兩個固定七日視窗各需至少三個有效晨重日期，並補充腰圍、訓練表現、恢復與飲食完整度；不能確認停滯。']:flags||performanceDecline?[performanceDecline?'相同動作、重量模式與負荷的工作組平均表現下降，先檢視恢復與訓練，不继续減餐或加量。':'恢復或疼痛紀錄需先檢視，不繼續減餐或加量。']:status==='maintain'?['體重平均或腰圍緩慢下降，先維持並確認訓練表現與恢復。']:['先檢查份量、油、醬、飲料與實際執行；確認後才討論每日少約 100–150 kcal，不自動套用。'];
  return {date,current,previous,weight_points:weight,waist_points:waist,weight_change_kg:change,training_sessions:workouts.length,reported_days:reported.size,complete_days:complete.size,recovery_flags:flags,status,messages,suggestions:[{id:'review-next',title:insufficient?'補足回顧資料':status==='maintain'?'維持並繼續記錄':'確認後檢視方案',detail:messages[0],category:flags?'recovery':insufficient?'data':'training',requires_confirmation:status==='review'}]};
 }
