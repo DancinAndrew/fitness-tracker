@@ -204,6 +204,8 @@ export function foodSuggestions(intake: IntakeSummary, settings: Settings): Sugg
     const suggestions: Suggestion[] = [];
     if (protein.range.max < settings.protein_g.min)
         suggestions.push({ id: 'food-protein', title: '依剩餘餐次安排蛋白質', detail: settings.protein_g.min - protein.range.max >= 20 ? '可選一包即食雞胸，核對整包標示蛋白質約 20 g 以上；或適合限制的替代品。只有確認實際吃下才入帳。' : '可按缺口選茶葉蛋 1–2 顆或無糖豆漿，核對容量與營養標示，不固定全部加。', category: 'food', requires_confirmation: false });
+    if (energy.range.max < settings.energy_kcal.min)
+        suggestions.push({ id: 'food-energy', title: '依飢餓感與剩餘餐次安排主食', detail: '已回報能量偏少時，可在下一餐安排地瓜約 100–150 g 或飯糰一個，核對份量與標示；這是試行範圍，不必為填滿熱量差硬吃，確認實際吃下才入帳。', category: 'food', requires_confirmation: false });
     if (intake.vegetable_servings === null || intake.vegetable_servings < 3)
         suggestions.push({ id: 'food-vegetables', title: '下一餐安排蔬菜', detail: '可選生菜沙拉、加熱蔬菜或關東煮蔬菜，確認實際份量與醬料；不把一小撮當一份。', category: 'food', requires_confirmation: false });
     return suggestions.slice(0, 2);
