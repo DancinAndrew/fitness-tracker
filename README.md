@@ -13,6 +13,7 @@
 3. 網站刷新讀到同一筆紀錄。可以修改該餐各食物的攝取比例、補充量測與備註。
 4. 每週查看趨勢。計畫调整需要明確確認；體重增加、漏報或建議不會自動改變熱量或訓練。
 
+- [本版交付與驗證](docs/delivery-v1.md)
 - [Remote 操作與資料範圍](docs/remote-workflow.md)
 - [API 合約](docs/api-contract.md)
 - [驗收要求](docs/acceptance-test-plan.md)／[合成測試證據與限制](tests/README.md)
