@@ -89,18 +89,23 @@ def backup(root, target):
     secure_dir(target.parent)
     if target.exists():
         raise ValueError('Backup destination already exists; choose a new filename')
+    files = []
+    for folder in ('assets', 'pending', 'exports'):
+        base = root / folder
+        if base.exists():
+            for item in sorted(base.rglob('*')):
+                if item.is_symlink():
+                    raise ValueError('Backup does not follow symbolic links')
+                if item.is_file():
+                    files.append(item)
+    if (root / 'manifest.json').exists():
+        files.append(root / 'manifest.json')
+    if sum(item.stat().st_size for item in files) > 512 * 1024 * 1024:
+        raise ValueError('Backup exceeds the matching 512 MiB restore limit')
     fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'wb') as stream, zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as archive:
-        for folder in ('assets', 'pending', 'exports'):
-            base = root / folder
-            if base.exists():
-                for item in sorted(base.rglob('*')):
-                    if item.is_symlink():
-                        raise ValueError('Backup does not follow symbolic links')
-                    if item.is_file():
-                        archive.write(item, item.relative_to(root).as_posix())
-        if (root / 'manifest.json').exists():
-            archive.write(root / 'manifest.json', 'manifest.json')
+        for item in files:
+            archive.write(item, item.relative_to(root).as_posix())
     return {'backup_created': True, 'cloud_backup': 'only previously exported files', 'photos_encrypted': False}
 
 
@@ -149,6 +154,23 @@ def stage(root, payload_file):
     return {'request_id': request_id, 'state': 'pending', 'cloud_saved': False}
 
 
+def remove_asset(root, asset_id, confirmed_unreferenced=False):
+    if not confirmed_unreferenced:
+        raise ValueError('First verify no cloud record references this photo and obtain explicit photo-deletion intent')
+    if not re.fullmatch(r'photo_[a-f0-9]{32}', asset_id):
+        raise ValueError('Invalid asset reference')
+    index = manifest(root)
+    entry = index['assets'].get(asset_id)
+    if entry:
+        path = (root / entry['file']).resolve()
+        if not path.is_relative_to((root / 'assets').resolve()):
+            raise ValueError('Invalid asset path')
+        path.unlink(missing_ok=True)
+        del index['assets'][asset_id]
+        save_json(root / 'manifest.json', index)
+    return {'asset_ref': asset_id, 'local_photo_removed': True, 'cloud_records_removed': False, 'backups_removed': False, 'provider_chat_removed': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1] / '.private')
@@ -157,11 +179,13 @@ def main():
     sub.add_parser('stage').add_argument('payload', type=Path)
     sub.add_parser('backup').add_argument('target', type=Path)
     rest = sub.add_parser('restore'); rest.add_argument('archive', type=Path); rest.add_argument('destination', type=Path)
+    remove = sub.add_parser('remove'); remove.add_argument('asset_ref'); remove.add_argument('--confirmed-unreferenced', action='store_true')
     args = parser.parse_args()
     secure_dir(args.root)
     if args.command == 'ingest': result = ingest(args.root, args.photos)
     elif args.command == 'stage': result = stage(args.root, args.payload)
     elif args.command == 'backup': result = backup(args.root, args.target)
+    elif args.command == 'remove': result = remove_asset(args.root, args.asset_ref, args.confirmed_unreferenced)
     else: result = restore(args.archive, args.destination)
     print(json.dumps(result, ensure_ascii=False))
 

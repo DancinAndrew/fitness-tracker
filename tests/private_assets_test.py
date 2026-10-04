@@ -42,5 +42,17 @@ class PrivateAssetsTest(unittest.TestCase):
             payload.write_text('{"request_id":"synthetic-request-1","data":"changed"}')
             with self.assertRaises(ValueError): assets.stage(base / 'private', payload)
 
+    def test_explicit_local_removal_does_not_claim_backup_or_cloud_deletion(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp); root = base / 'private'; photo = base / 'synthetic.png'
+            photo.write_bytes(b'synthetic fixture')
+            asset_id = assets.ingest(root, [str(photo)])['assets'][0]['asset_ref']
+            with self.assertRaises(ValueError): assets.remove_asset(root, asset_id)
+            result = assets.remove_asset(root, asset_id, confirmed_unreferenced=True)
+            self.assertFalse(result['backups_removed'])
+            self.assertFalse(result['cloud_records_removed'])
+            self.assertEqual(assets.manifest(root)['assets'], {})
+            self.assertEqual(list((root / 'assets').iterdir()), [])
+
 
 if __name__ == '__main__': unittest.main()
